@@ -1,0 +1,48 @@
+:local smtpserv [:resolve "smtp.yandex.ru"];
+:local smtpport "587";
+:local emailfrom "router@";
+:local pass "pass";
+:local emailto "backup@svc";
+
+:local name [/system identity get name];
+:local time [/system clock get time];
+:local date [/system clock get date];
+
+:local day [:pick $date 4 6]
+:local month [:pick $date 0 3]
+:local year [:pick $date 7 11]
+
+:local datetime "$day-$month-$year $time"
+:local dateprefix "$year-$month-$day_$time"
+:log info "Backup started on $name at $datetime";
+
+:local backupfile ($name . "-backup-" . $dateprefix . ".backup");
+:local exportfile ($name . "-export-" . $dateprefix);
+
+:log info "Backup configration from $name to $backupfile";
+/system backup save dont-encrypt=yes name=$backupfile;
+:delay 5;
+
+:log info "Export configration from $name to $exportfile";
+/export file=$exportfile;
+:delay 3;
+
+:local backupsubject "Mikrotik backup config $name $datetime";
+:local exportsubject "Mikrotik export config $name $datetime";
+
+:local backupbody [ip address export];
+:local exportbody [ip address export];
+
+:log info "Send backup $backupfile to email";
+/tool e-mail send server=$smtpserv port=$smtpport user=$emailfrom password=$pass start-tls=yes to=$emailto from=$emailfrom subject=$backupsubject body="$backupbody" file=$backupfile;
+:delay 20;
+
+:log info "Send export $exportfile to email";
+/tool e-mail send server=$smtpserv port=$smtpport user=$emailfrom password=$pass start-tls=yes to=$emailto from=$emailfrom subject=$exportsubject body="$exportbody" file=$exportfile;
+:delay 20;
+
+:log info "Remove backup and config files";
+/file remove $backupfile;
+/file remove $exportfile;
+
+:log warning "Backup, export e-mail finished";
